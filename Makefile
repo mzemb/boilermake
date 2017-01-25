@@ -367,7 +367,8 @@ $(foreach TGT,${ALL_TGTS},\
     $(eval $(call ADD_OBJECT_RULE,${BUILD_DIR}/$(call CANONICAL_PATH,${TGT}),\
              ${EXT},$${COMPILE_CXX_CMDS}))))
 
-# clean rules are replaced with a single call to svn-clean
+# clean rules are replaced with a single call to source control clean
+# (a lot safer that we are in a clean state instead of relying on usual make clean)      
 .PHONY: clean
 clean:
 	perl /usr/bin/svn-clean
