@@ -27,19 +27,13 @@
 #       instances of "$" within them need to be escaped with a second "$" to
 #       accomodate the double expansion that occurs when eval is invoked.
 
-# ADD_CLEAN_RULE - Parameterized "function" that adds a new rule and phony
-#   target for cleaning the specified target (removing its build-generated
-#   files).
 #
-#   USE WITH EVAL
+# verbosity control: call > make VERBOSE=1 target to see commands printed to stdout
 #
-define ADD_CLEAN_RULE
-    clean: clean_${1}
-    .PHONY: clean_${1}
-    clean_${1}:
-	$$(strip rm -f ${TARGET_DIR}/${1} $${${1}_OBJS:%.o=%.[doP]})
-	$${${1}_POSTCLEAN}
-endef
+VERBOSE := 0
+AT_0 := @
+AT_1 := 
+AT := $(AT_$(VERBOSE))
 
 # ADD_OBJECT_RULE - Parameterized "function" that adds a pattern rule for
 #   building object files from source files with the filename extension
@@ -68,8 +62,8 @@ define ADD_TARGET_RULE
         # Add a target for creating a static library.
         $${TARGET_DIR}/${1}: $${${1}_OBJS}
 	    @mkdir -p $$(dir $$@)
-	    $$(strip $${AR} $${ARFLAGS} $$@ $${${1}_OBJS})
-	    $${${1}_POSTMAKE}
+	    $$(AT)$$(strip $${AR} $${ARFLAGS} $$@ $${${1}_OBJS})
+	    $$(AT)$${${1}_POSTMAKE}
     else
         # Add a target for linking an executable. First, attempt to select the
         # appropriate front-end to use for linking. This might not choose the
@@ -89,9 +83,10 @@ define ADD_TARGET_RULE
 
         $${TARGET_DIR}/${1}: $${${1}_OBJS} $${${1}_PREREQS}
 	    @mkdir -p $$(dir $$@)
-	    $$(strip $${${1}_LINKER} -o $$@ $${LDFLAGS} $${${1}_LDFLAGS} \
+		@echo "# making $$@"
+	    $$(AT)$$(strip $${${1}_LINKER} -o $$@ $${LDFLAGS} -Wl,-Map=$$@.map $${${1}_LDFLAGS} \
 	        $${${1}_OBJS} $${LDLIBS} $${${1}_LDLIBS})
-	    $${${1}_POSTMAKE}
+	    $$(AT)$${${1}_POSTMAKE}
     endif
 endef
 
@@ -107,8 +102,9 @@ endef
 
 # COMPILE_C_CMDS - Commands for compiling C source code.
 define COMPILE_C_CMDS
+	@echo "# making $@"
 	@mkdir -p $(dir $@)
-	$(strip ${CC} -o $@ -c -MD ${CFLAGS} ${SRC_CFLAGS} ${INCDIRS} \
+	$(AT)$(strip ${CC} -o $@ -c -MD ${CFLAGS} ${SRC_CFLAGS} ${INCDIRS} \
 	    ${SRC_INCDIRS} ${SRC_DEFS} ${DEFS} $<)
 	@cp ${@:%$(suffix $@)=%.d} ${@:%$(suffix $@)=%.P}; \
 	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
@@ -119,8 +115,9 @@ endef
 
 # COMPILE_CXX_CMDS - Commands for compiling C++ source code.
 define COMPILE_CXX_CMDS
+	@echo "# making $@"
 	@mkdir -p $(dir $@)
-	$(strip ${CXX} -o $@ -c -MD ${CXXFLAGS} ${SRC_CXXFLAGS} ${INCDIRS} \
+	$(AT)$(strip ${CXX} -o $@ -c -MD ${CXXFLAGS} ${SRC_CXXFLAGS} ${INCDIRS} \
 	    ${SRC_INCDIRS} ${SRC_DEFS} ${DEFS} $<)
 	@cp ${@:%$(suffix $@)=%.d} ${@:%$(suffix $@)=%.P}; \
 	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
@@ -139,7 +136,9 @@ define INCLUDE_SUBMAKEFILE
     # Initialize all variables that can be defined by a makefile fragment, then
     # include the specified makefile fragment.
     TARGET        :=
+    TGT_CC        :=
     TGT_CFLAGS    :=
+    TGT_CXX       :=
     TGT_CXXFLAGS  :=
     TGT_DEFS      :=
     TGT_INCDIRS   :=
@@ -185,7 +184,9 @@ define INCLUDE_SUBMAKEFILE
         # makefile apply to this new target. Initialize the target's variables.
         TGT := $$(strip $${TARGET})
         ALL_TGTS += $${TGT}
+        $${TGT}_CC        := $${TGT_CC}
         $${TGT}_CFLAGS    := $${TGT_CFLAGS}
+        $${TGT}_CXX       := $${TGT_CXX}
         $${TGT}_CXXFLAGS  := $${TGT_CXXFLAGS}
         $${TGT}_DEFS      := $${TGT_DEFS}
         $${TGT}_DEPS      :=
@@ -247,6 +248,8 @@ define INCLUDE_SUBMAKEFILE
         # variables that were defined.
         $${TGT}_OBJS += $${OBJS}
         $${TGT}_DEPS += $${OBJS:%.o=%.P}
+        $${OBJS}: CC           := $$(if $${$${TGT}_CC},$${$${TGT}_CC},$${CC})
+        $${OBJS}: CXX          := $$(if $${$${TGT}_CXX},$${$${TGT}_CXX},$${CXX})
         $${OBJS}: SRC_CFLAGS   := $${$${TGT}_CFLAGS} $${SRC_CFLAGS}
         $${OBJS}: SRC_CXXFLAGS := $${$${TGT}_CXXFLAGS} $${SRC_CXXFLAGS}
         $${OBJS}: SRC_DEFS     := $$(addprefix -D,$${$${TGT}_DEFS} $${SRC_DEFS})
@@ -346,7 +349,6 @@ INCDIRS := $(addprefix -I,$(call CANONICAL_PATH,${INCDIRS}))
 
 # Define the "all" target (which simply builds all user-defined targets) as the
 # default goal.
-.PHONY: all
 all: $(addprefix ${TARGET_DIR}/,${ALL_TGTS})
 
 # Add a new target rule for each user-defined target.
@@ -365,10 +367,10 @@ $(foreach TGT,${ALL_TGTS},\
     $(eval $(call ADD_OBJECT_RULE,${BUILD_DIR}/$(call CANONICAL_PATH,${TGT}),\
              ${EXT},$${COMPILE_CXX_CMDS}))))
 
-# Add "clean" rules to remove all build-generated files.
+# clean rules are replaced with a single call to svn-clean
 .PHONY: clean
-$(foreach TGT,${ALL_TGTS},\
-  $(eval $(call ADD_CLEAN_RULE,${TGT})))
+clean:
+	perl /usr/bin/svn-clean
 
 # Include generated rules that define additional (header) dependencies.
 $(foreach TGT,${ALL_TGTS},\
