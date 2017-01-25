@@ -46,7 +46,7 @@ AT := $(AT_$(VERBOSE))
 #   USE WITH EVAL
 #
 define ADD_OBJECT_RULE
-${1}/%.o: ${2}
+${1}/%.o: ${2} | target/gitHash.h
 	${3}
 endef
 
@@ -382,4 +382,5 @@ $(foreach TGT,${ALL_TGTS},\
   $(eval -include ${${TGT}_DEPS}))
 
 include main.mk
+include flow.mk
 
