@@ -347,9 +347,10 @@ $(eval $(call INCLUDE_SUBMAKEFILE,main.mk))
 DEFS := $(addprefix -D,${DEFS})
 INCDIRS := $(addprefix -I,$(call CANONICAL_PATH,${INCDIRS}))
 
-# Define the "all" target (which simply builds all user-defined targets) as the
-# default goal.
-all: $(addprefix ${TARGET_DIR}/,${ALL_TGTS})
+all:                 \
+	target/rpi/hello \
+	target/x64/hello                      
+	@echo "# making $@"
 
 # Add a new target rule for each user-defined target.
 $(foreach TGT,${ALL_TGTS},\
@@ -376,8 +377,9 @@ clean:
 	@echo "# making $@"
 	$(AT)/usr/bin/git clean -fd
 	
-
 # Include generated rules that define additional (header) dependencies.
 $(foreach TGT,${ALL_TGTS},\
   $(eval -include ${${TGT}_DEPS}))
+
+include main.mk
 
