@@ -369,10 +369,15 @@ $(foreach TGT,${ALL_TGTS},\
 
 # clean rules are replaced with a single call to source control clean
 # (a lot safer that we are in a clean state instead of relying on usual make clean)      
+# Note: for svn you can use: perl /usr/bin/svn-clean
+# ( from http://svn.apache.org/repos/asf/subversion/trunk/contrib/client-side/svn-clean )
 .PHONY: clean
 clean:
-	perl /usr/bin/svn-clean
+	@echo "# making $@"
+	$(AT)/usr/bin/git clean -fd
+	
 
 # Include generated rules that define additional (header) dependencies.
 $(foreach TGT,${ALL_TGTS},\
   $(eval -include ${${TGT}_DEPS}))
+
